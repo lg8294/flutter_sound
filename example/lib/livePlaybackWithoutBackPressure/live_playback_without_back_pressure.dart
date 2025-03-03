@@ -40,14 +40,18 @@ Feeding Flutter Sound without back pressure is very simple but you can have two 
 * The App does not have any knowledge of when the block given to Flutter Sound is really played.
 For example, if it does a `stopPlayer()` it will loose all the buffered data not yet played.
 
+## You can see also those examples:
+- [Streams](ex_streams)
+- [Record To Stream](ex_record_to_stream)
+- [Live Playback With Backpressure](fs-ex_playback_from_stream_2)
+
  */
 
 ///
-const int cstSAMPLERATE = 8000; // 8000; // 48000
-const int cstCHANNELNB = 2; // 2 // 1;
-const Codec cstCODEC = Codec.pcm16; // Codec.pcm16 /// Codec.pcmFloat32;
-const String cstASSET =
+const String kASSET16 =
     'assets/samples/sample_s16_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw' // 'assets/samples/sample_f32.raw'
+const String kASSET32 =
+    'assets/samples/sample_f32.raw'; // 'assets/samples/sample_f32_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw' // 'assets/samples/sample_f32.raw'
 
 ///
 const int cstBLOCKSIZE = 4096;
@@ -68,30 +72,22 @@ class _LivePlaybackWithoutBackPressureState
     extends State<LivePlaybackWithoutBackPressure> {
   final FlutterSoundPlayer _mPlayer = FlutterSoundPlayer();
   bool _mPlayerIsInited = false;
+  Codec codecSelected = Codec.pcmFloat32;
   double _mSpeed = 100.0;
+  late Uint8List data16;
+  late Uint8List data32;
   late Uint8List data;
-
-  Future<void> initPlayer() async {
-    await _mPlayer.openPlayer();
-    _mPlayerIsInited = false;
-    data = await getAssetData(cstASSET);
-
-    setState(() {
-      _mPlayerIsInited = true;
-    });
-  }
+  late int sampleRate;
+  late bool stereo;
 
   @override
   void initState() {
     super.initState();
-    // Be careful : openAudioSession return a Future.
-    // Do not access your FlutterSoundPlayer or FlutterSoundRecorder before the completion of the Future
-//    _mPlayer.openPlayer().then((value) {
-//      setState(() {
-//        _mPlayerIsInited = true;
-//      });
-//    });
-    initPlayer();
+    initPlayer().then((void _) {
+      setState(() {
+        _mPlayerIsInited = true;
+      });
+    });
   }
 
   @override
@@ -101,44 +97,15 @@ class _LivePlaybackWithoutBackPressureState
     super.dispose();
   }
 
-  // -------  Here is the code to play Live data without back-pressure ------------
+  // --------------------------------  The Player stuff  ---------------------------
 
-  void feedHim(Uint8List data) {
-    var start = 0;
-    var totalLength = data.length;
-    while (totalLength > 0 && !_mPlayer.isStopped) {
-      var ln = totalLength > cstBLOCKSIZE ? cstBLOCKSIZE : totalLength;
-      _mPlayer.foodSink!.add(FoodData(data.sublist(start, start + ln)));
-      totalLength -= ln;
-      start += ln;
-    }
+  Future<void> initPlayer() async {
+    await _mPlayer.openPlayer();
+    _mPlayerIsInited = false;
+    data16 = await getAssetData(kASSET16);
+    data32 = await getAssetData(kASSET32);
+    setCodec(Codec.pcmFloat32);
   }
-
-  void play() async {
-    await _mPlayer.startPlayerFromStream(
-      codec: cstCODEC,
-      numChannels: cstCHANNELNB,
-      interleaved: true,
-      sampleRate: cstSAMPLERATE,
-      bufferSize: 20480,
-      //whenFinished: () {
-      // FlutterSoundPlayer().logger.i("FINISHED!");
-      //}
-    );
-
-    feedHim(data);
-    //if (_mPlayer != null) {
-    // We must not do stopPlayer() directely //await stopPlayer();
-    //_mPlayer.foodSink!.add(FoodEvent(() async {
-    //await _mPlayer.stopPlayer();
-    //FlutterSoundPlayer().logger.i("MARKER!");
-
-    setState(() {});
-    //}));
-    //}
-  }
-
-  // --------------------- (it was very simple, wasn't it ?) -------------------
 
   Future<Uint8List> getAssetData(String path) async {
     var asset = await rootBundle.load(path);
@@ -161,18 +128,52 @@ class _LivePlaybackWithoutBackPressureState
     );
   }
 
-  Fn? getPlaybackFn() {
-    if (!_mPlayerIsInited) {
-      return null;
+  // --------------------------  Here is the code to play Live data without back-pressure ----------------------
+
+  /// In this example we give the data to Flutter Sound chunk by chunk. We feed the sink without waiting,
+  void feedHim(Uint8List data) {
+    var start = 0;
+    var totalLength = data.length;
+    while (totalLength > 0 && !_mPlayer.isStopped) {
+      var ln = totalLength > cstBLOCKSIZE ? cstBLOCKSIZE : totalLength;
+      _mPlayer.uint8ListSink!.add(data.sublist(start, start + ln));
+      //_mPlayer.foodSink!.add(FoodData(data.sublist(start, start + ln)));
+      totalLength -= ln;
+      start += ln;
     }
-    return _mPlayer.isPlaying
-        ? () {
-            stopPlayer().then((value) => setState(() {}));
-          }
-        : play;
   }
 
-  // ----------------------------------------------------------------------------------------------------------------------
+  /// Start the player from a Codec.pcm16 Stream, Stereo
+  void play() async {
+    await _mPlayer.startPlayerFromStream(
+      codec: codecSelected, // Codec.pcm16
+      numChannels: stereo ? 2 : 1,
+      interleaved: true, // This is the default
+      sampleRate: sampleRate, // Sample rate is 8000
+      //bufferSize: cstBLOCKSIZE,
+    );
+    feedHim(data);
+    _mPlayer.logger.d('Finished');
+
+    setState(() {});
+  }
+
+  // --------------------- (it was very simple, wasn't it ?) -------------------
+
+  void setCodec(Codec? codec) {
+    if (codec == Codec.pcm16) {
+      data = data16;
+      sampleRate = 8000;
+      stereo = true;
+    } else {
+      data = data32;
+      sampleRate = 8000;
+      stereo = false;
+    }
+    setState(() {
+      codecSelected = codec!;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +195,11 @@ class _LivePlaybackWithoutBackPressureState
           child: Column(children: [
             Row(children: [
               ElevatedButton(
-                onPressed: getPlaybackFn(),
+                onPressed: _mPlayerIsInited
+                    ? () {
+                        _mPlayer.isPlaying ? stopPlayer() : play();
+                      }
+                    : null,
                 //color: Colors.white,
                 //disabledColor: Colors.grey,
                 child: Text(_mPlayer.isPlaying ? 'stop' : 'Play'),
@@ -215,6 +220,34 @@ class _LivePlaybackWithoutBackPressureState
               //divisions: 100
             ),
           ]),
+        ),
+        ListTile(
+          tileColor: const Color(0xFFFAF0E6),
+          title: const Text('PCM-Float32'),
+          dense: true,
+
+          //textColor: encoderSupported[Codec.pcmFloat32.index]
+          //? Colors.green
+          //: Colors.grey,
+          leading: Radio<Codec>(
+            value: Codec.pcmFloat32,
+            groupValue: codecSelected,
+            onChanged: setCodec,
+          ),
+        ),
+        ListTile(
+          tileColor: const Color(0xFFFAF0E6),
+          title: const Text('PCM-Int16'),
+          dense: true,
+
+          ///textColor: encoderSupported[Codec.pcm16.index]
+          ///? Colors.green
+          //: Colors.grey,
+          leading: Radio<Codec>(
+            value: Codec.pcm16,
+            groupValue: codecSelected,
+            onChanged: setCodec,
+          ),
         ),
       ]);
     }

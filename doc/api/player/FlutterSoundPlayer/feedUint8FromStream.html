@@ -25,7 +25,7 @@
   <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../player/player-library.html">public&#47;flutter_sound_player.dart</a></li>
+    <li><a href="../../player">public&#47;flutter_sound_player.dart</a></li>
     <li><a href="../../player/FlutterSoundPlayer-class.html">FlutterSoundPlayer</a></li>
     <li class="self-crumb">feedUint8FromStream method</li>
   </ol>
@@ -78,6 +78,7 @@
   if (isStopped) {
     return 0;
   }
+  &#47;*
   _needSomeFoodCompleter =
       Completer&lt;int&gt;(); &#47;&#47; Not completed until the device accept new data
   try {
@@ -104,6 +105,8 @@
     return _needSomeFoodCompleter!.future;
   }
   return 0;
+   *&#47;
+  return _feed(buffer);
 }</code></pre>
 </section>
 
@@ -118,7 +121,7 @@
 </header>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../player/player-library.html">player</a></li>
+    <li><a href="../../player">player</a></li>
     <li><a href="../../player/FlutterSoundPlayer-class.html">FlutterSoundPlayer</a></li>
     <li class="self-crumb">feedUint8FromStream method</li>
 </ol>
@@ -132,7 +135,7 @@
 <footer>
   <span class="no-break">
     flutter_sound
-      9.24.0
+      9.24.5
   </span>
   
 </footer>

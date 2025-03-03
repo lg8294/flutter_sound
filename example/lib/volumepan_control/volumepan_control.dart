@@ -30,8 +30,7 @@ import 'package:flutter_sound/flutter_sound.dart';
  *
  */
 
-const _exampleAudioFilePathMP3_1 =
-    'https://canardoux.github.io/tau-fsdoc/extract/05.mp3';
+const _exampleAudioFilePathMP3_1 = 'https://fs-doc.vercel.app/extract/05.mp3';
 
 ///
 typedef Fn = void Function();
@@ -80,7 +79,7 @@ class _VolumePanControlState extends State<VolumePanControl> {
     super.dispose();
   }
 
-  // -------  Here is the code to playback a remote file -----------------------
+  // --------------------------  Here is the code to playback a remote file ---------------------------------
 
   void play(FlutterSoundPlayer? player, String uri) async {
     await player!.startPlayer(
@@ -101,7 +100,6 @@ class _VolumePanControlState extends State<VolumePanControl> {
     v = v > 100.0 ? 100.0 : v;
     _mVolume1 = v;
     setState(() {});
-    //await _mPlayer!.setVolume(v / 100, fadeDuration: Duration(milliseconds: 5000));
     await _mPlayer1.setVolumePan(
       _mVolume1 / 100,
       _mPan1 / 100,
@@ -114,14 +112,13 @@ class _VolumePanControlState extends State<VolumePanControl> {
     p = p < -100.0 ? -100.0 : p;
     _mPan1 = p;
     setState(() {});
-    //await _mPlayer!.setVolume(v / 100, fadeDuration: Duration(milliseconds: 5000));
     await _mPlayer1.setVolumePan(
       _mVolume1 / 100,
       _mPan1 / 100,
     );
   }
 
-  // --------------------- UI -------------------
+  // ------------------------------------ UI --------------------------------------------
 
   Fn? getPlaybackFn(FlutterSoundPlayer? player, String uri) {
     if (!(_mPlayerIsInited1 && _mPlayerIsInited2)) {

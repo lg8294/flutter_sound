@@ -25,7 +25,7 @@
   <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../recorder/recorder-library.html">public&#47;flutter_sound_recorder.dart</a></li>
+    <li><a href="../../recorder">public&#47;flutter_sound_recorder.dart</a></li>
     <li><a href="../../recorder/FlutterSoundRecorder-class.html">FlutterSoundRecorder</a></li>
     <li class="self-crumb">getRecordURL method</li>
   </ol>
@@ -83,8 +83,10 @@ of <a href="../../recorder/FlutterSoundRecorder/stopRecorder.html">stopRecorder(
   if (_isInited != Initialized.fullyInitialized) {
     throw Exception(&#39;Recorder is not open&#39;);
   }
-  var url =
-      await FlutterSoundRecorderPlatform.instance.getRecordURL(this, path);
+  var url = await FlutterSoundRecorderPlatform.instance.getRecordURL(
+    this,
+    path,
+  );
   return url;
 }</code></pre>
 </section>
@@ -100,7 +102,7 @@ of <a href="../../recorder/FlutterSoundRecorder/stopRecorder.html">stopRecorder(
 </header>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../recorder/recorder-library.html">recorder</a></li>
+    <li><a href="../../recorder">recorder</a></li>
     <li><a href="../../recorder/FlutterSoundRecorder-class.html">FlutterSoundRecorder</a></li>
     <li class="self-crumb">getRecordURL method</li>
 </ol>
@@ -114,7 +116,7 @@ of <a href="../../recorder/FlutterSoundRecorder/stopRecorder.html">stopRecorder(
 <footer>
   <span class="no-break">
     flutter_sound
-      9.24.0
+      9.24.5
   </span>
   
 </footer>

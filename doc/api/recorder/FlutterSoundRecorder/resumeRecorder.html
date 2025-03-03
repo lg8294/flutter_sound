@@ -25,7 +25,7 @@
   <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../recorder/recorder-library.html">public&#47;flutter_sound_recorder.dart</a></li>
+    <li><a href="../../recorder">public&#47;flutter_sound_recorder.dart</a></li>
     <li><a href="../../recorder/FlutterSoundRecorder-class.html">FlutterSoundRecorder</a></li>
     <li class="self-crumb">resumeRecorder method</li>
   </ol>
@@ -78,7 +78,7 @@ An exception is thrown if the Recorder is not currently paused.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; resumeRecorder() async {
-  _logger.d(&#39;FS:---&gt; resumeRecorder &#39;);
+  _logger.d(&#39;FS:---&gt; pausePlayer &#39;);
   await _lock.synchronized(() async {
     await _resumeRecorder();
   });
@@ -97,7 +97,7 @@ An exception is thrown if the Recorder is not currently paused.</p>
 </header>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">flutter_sound</a></li>
-    <li><a href="../../recorder/recorder-library.html">recorder</a></li>
+    <li><a href="../../recorder">recorder</a></li>
     <li><a href="../../recorder/FlutterSoundRecorder-class.html">FlutterSoundRecorder</a></li>
     <li class="self-crumb">resumeRecorder method</li>
 </ol>
@@ -111,7 +111,7 @@ An exception is thrown if the Recorder is not currently paused.</p>
 <footer>
   <span class="no-break">
     flutter_sound
-      9.24.0
+      9.24.5
   </span>
   
 </footer>

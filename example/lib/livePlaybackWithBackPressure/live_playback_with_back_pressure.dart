@@ -36,13 +36,20 @@ If you do not need any back pressure, you can see another simple example :
 This other example is a little bit simpler because the App does not need to await
 the playback for each block before playing another one.
 
+## You can see also those examples:
+- [Streams](ex_streams)
+- [Record To Stream](ex_record_to_stream)
+- [Live Playback Without Backpressure](fs-ex_playback_from_stream_1)
+
  */
 
-///
-const blockSize = 20480;
+const String kASSET16 =
+    'assets/samples/sample_s16_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw' // 'assets/samples/sample_f32.raw'
+const String kASSET32 =
+    'assets/samples/sample_f32.raw'; // 'assets/samples/sample_f32_2ch.raw'; // 'assets/samples/sample_f32_2ch.raw' // 'assets/samples/sample_f32.raw'
 
 ///
-const int tSampleRate = 44100;
+const kBLOCKSIZE = 4096;
 
 ///
 typedef Fn = void Function();
@@ -58,15 +65,34 @@ class LivePlaybackWithBackPressure extends StatefulWidget {
 
 class _LivePlaybackWithBackPressureState
     extends State<LivePlaybackWithBackPressure> {
-  FlutterSoundPlayer? _mPlayer = FlutterSoundPlayer();
+  final FlutterSoundPlayer _mPlayer = FlutterSoundPlayer();
   bool _mPlayerIsInited = false;
+  Codec codecSelected = Codec.pcmFloat32;
+  late Uint8List data16;
+  late Uint8List data32;
+  late Uint8List data;
+  late int sampleRate;
+  late bool stereo;
+  bool flowControl = true;
+
+  Future<void> initPlayer() async {
+    await _mPlayer.openPlayer();
+    _mPlayerIsInited = false;
+    data16 = await getAssetData(kASSET16);
+    data32 = await getAssetData(kASSET32);
+    setCodec(Codec.pcmFloat32);
+
+    setState(() {
+      _mPlayerIsInited = true;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     // Be careful : openAudioSession return a Future.
     // Do not access your FlutterSoundPlayer or FlutterSoundRecorder before the completion of the Future
-    _mPlayer!.openPlayer().then((value) {
+    initPlayer().then((value) {
       setState(() {
         _mPlayerIsInited = true;
       });
@@ -76,51 +102,53 @@ class _LivePlaybackWithBackPressureState
   @override
   void dispose() {
     //stopPlayer();
-    _mPlayer!.closePlayer();
-    _mPlayer = null;
+    _mPlayer.closePlayer();
 
     super.dispose();
   }
 
-  // -------  Here is the code to play Live data with back-pressure ------------
+  // -----------------------  Here is the code to play Live data with back-pressure -----------------------
 
+  /// Start the player from a Codec.pcm16 Stream, stereo
   void play() async {
-    assert(_mPlayerIsInited && _mPlayer!.isStopped);
-    await _mPlayer!.startPlayerFromStream(
-      codec: Codec.pcm16,
-      numChannels: 1,
-      sampleRate: tSampleRate,
-      bufferSize: 20480,
+    assert(_mPlayerIsInited && _mPlayer.isStopped);
+    await _mPlayer.startPlayerFromStream(
+      codec: codecSelected,
+      numChannels: stereo ? 2 : 1,
+      sampleRate: sampleRate,
     );
     setState(() {});
-    var data = await getAssetData('assets/samples/sample.pcm');
+
     await feedHim(data);
-    if (_mPlayer != null) {
-      await stopPlayer();
-      setState(() {});
-    }
+    //if (_mPlayer != null) {
+    //await stopPlayer();
+    //setState(() {});
+    //}
   }
 
   // Here we call the verb "await feedFromStream()" (with await!!!) for each block of BLOCK_SIZE size.
   // This is just for demonstration of calling sequentially several "await feedFromStream()" (with await!!!!).
-  // Of course this is just for demo. The following code is exactly what there is in the procedure ```feedForStream()```
-  // so in a real app, you will call simply ```await feedForStream()``` (with await !!!!)
   // Be very careful not calling a second `feedFromStream()` when the previous one has not completed his future.
   //
-  // **You may not have two calls two calls to `feedFromStream()` simultaneously.**
-  // ******************************************************************************
-  // And, of course, you may not mix those verbs with the real output food Stream.
+  // **You may not have two calls to `feedFromStream()` simultaneously.**
+  // ********************************************************************
+  // And, of course, you may not mix those verbs with the real output food Stream Sink.
 
   Future<void> feedHim(Uint8List buffer) async {
-    var lnData = 0;
+    var start = 0;
     var totalLength = buffer.length;
-    while (totalLength > 0 && !_mPlayer!.isStopped) {
-      var bsize = totalLength > blockSize ? blockSize : totalLength;
-      await _mPlayer!
-          .feedFromStream(buffer.sublist(lnData, lnData + bsize)); // await !!!!
-      lnData += bsize;
-      totalLength -= bsize;
+    while (totalLength > 0 && !_mPlayer.isStopped) {
+      var ln = totalLength > kBLOCKSIZE ? kBLOCKSIZE : totalLength;
+      if (flowControl) {
+        await _mPlayer.feedUint8FromStream(
+            buffer.sublist(start, start + ln)); // with await !!!!
+      } else {
+        _mPlayer.uint8ListSink!.add(data.sublist(start, start + ln));
+      }
+      start += ln;
+      totalLength -= ln;
     }
+    _mPlayer.logger.d('Finished');
   }
 
   // --------------------- (it was very simple, wasn't it ?) -------------------
@@ -131,16 +159,14 @@ class _LivePlaybackWithBackPressureState
   }
 
   Future<void> stopPlayer() async {
-    if (_mPlayer != null) {
-      await _mPlayer!.stopPlayer();
-    }
+    await _mPlayer.stopPlayer();
   }
 
   Fn? getPlaybackFn() {
     if (!_mPlayerIsInited) {
       return null;
     }
-    return _mPlayer!.isStopped
+    return _mPlayer.isStopped
         ? play
         : () {
             stopPlayer().then((value) => setState(() {}));
@@ -148,6 +174,21 @@ class _LivePlaybackWithBackPressureState
   }
 
   // ----------------------------------------------------------------------------------------------------------------------
+
+  void setCodec(Codec? codec) {
+    if (codec == Codec.pcmFloat32) {
+      data = data32;
+      sampleRate = 8000;
+      stereo = false;
+    } else {
+      data = data16;
+      sampleRate = 8000;
+      stereo = true;
+    }
+    setState(() {
+      codecSelected = codec!;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,15 +213,84 @@ class _LivePlaybackWithBackPressureState
                 onPressed: getPlaybackFn(),
                 //color: Colors.white,
                 //disabledColor: Colors.grey,
-                child: Text(_mPlayer!.isPlaying ? 'Stop' : 'Play'),
+                child: Text(_mPlayer.isPlaying ? 'Stop' : 'Play'),
               ),
               const SizedBox(
                 width: 20,
               ),
-              Text(_mPlayer!.isPlaying
+              Text(_mPlayer.isPlaying
                   ? 'Playback in progress'
                   : 'Player is stopped'),
             ]),
+          ),
+          ListTile(
+            tileColor: const Color(0xFFFAF0E6),
+            title: const Text('PCM-Float32'),
+            dense: true,
+
+            //textColor: encoderSupported[Codec.pcmFloat32.index]
+            //? Colors.green
+            //: Colors.grey,
+            leading: Radio<Codec>(
+              value: Codec.pcmFloat32,
+              groupValue: codecSelected,
+              onChanged: setCodec,
+            ),
+          ),
+          ListTile(
+            tileColor: const Color(0xFFFAF0E6),
+            title: const Text('PCM-Int16'),
+            dense: true,
+
+            ///textColor: encoderSupported[Codec.pcm16.index]
+            ///? Colors.green
+            //: Colors.grey,
+            leading: Radio<Codec>(
+              value: Codec.pcm16,
+              groupValue: codecSelected,
+              onChanged: setCodec,
+            ),
+          ),
+          const SizedBox(
+            height: 10,
+          ),
+          ListTile(
+            tileColor: const Color(0xFFFAF0E6),
+            title: const Text('With Flow Control'),
+            dense: true,
+
+            //textColor: encoderSupported[Codec.pcmFloat32.index]
+            //? Colors.green
+            //: Colors.grey,
+            leading: Radio<bool>(
+                value: true,
+                groupValue: flowControl,
+                onChanged: (v) {
+                  _mPlayer.stopPlayer().then((v) {
+                    setState(() {
+                      flowControl = true;
+                    });
+                  });
+                }),
+          ),
+          ListTile(
+            tileColor: const Color(0xFFFAF0E6),
+            title: const Text('Without Flow Control'),
+            dense: true,
+
+            ///textColor: encoderSupported[Codec.pcm16.index]
+            ///? Colors.green
+            //: Colors.grey,
+            leading: Radio<bool>(
+                value: false,
+                groupValue: flowControl,
+                onChanged: (v) {
+                  _mPlayer.stopPlayer().then((v) {
+                    setState(() {
+                      flowControl = false;
+                    });
+                  });
+                }),
           ),
         ],
       );

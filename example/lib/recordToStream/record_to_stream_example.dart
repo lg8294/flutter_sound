@@ -19,7 +19,6 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -28,21 +27,19 @@ import 'package:permission_handler/permission_handler.dart';
 
 /*
 
-This is an example showing how to record to a Dart Stream.
-It writes all the recorded data from a Stream to a File, which is completely stupid:
-if an App wants to record something to a File, it must not use streams.
+This is an example showing how to record to a Dart Stream. It writes all the recorded data from a Stream to a File using It calls [startRecorder(toStream:)](/api/recorder/FlutterSoundRecorder/startRecorder.html) to fill a buffer from a stream, which is completely stupid: if an App wants to record something to a File, it must not use streams.
+Then it can playback the file recorded.
 
 The real interest of recording to a Stream is for example to feed a
 Speech-to-Text engine, or for processing the Live data in Dart in real time.
+
+ You can also refer to the following guide:
+ - [Dart Streams](/tau/guides/guides_live_streams.html):
 
  */
 
 ///
 typedef _Fn = void Function();
-
-const int cstSAMPLERATE = 16000;
-const int cstCHANNELNB = 2;
-const Codec cstCODEC = Codec.pcm16;
 
 /// Example app.
 class RecordToStreamExample extends StatefulWidget {
@@ -58,49 +55,17 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
   bool _mPlayerIsInited = false;
   bool _mRecorderIsInited = false;
   String? _mPath;
+  StreamSubscription? _recorderSubscription;
+  Codec codecSelected = Codec.pcmFloat32;
 
   bool _mplaybackReady = false;
-  //String? _mPath;
+  double _dbLevel = 0.0;
   StreamSubscription? _mRecordingDataSubscription;
-  //Uint8List buffer = [];
-  ///int sampleRate = 16000;
-
-  Future<void> _openRecorder() async {
-    var status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      throw RecordingPermissionException('Microphone permission not granted');
-    }
-    await _mRecorder!.openRecorder();
-
-    final session = await AudioSession.instance;
-    await session.configure(AudioSessionConfiguration(
-      avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-      avAudioSessionCategoryOptions:
-          AVAudioSessionCategoryOptions.allowBluetooth |
-              AVAudioSessionCategoryOptions.defaultToSpeaker,
-      avAudioSessionMode: AVAudioSessionMode.spokenAudio,
-      avAudioSessionRouteSharingPolicy:
-          AVAudioSessionRouteSharingPolicy.defaultPolicy,
-      avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
-      androidAudioAttributes: const AndroidAudioAttributes(
-        contentType: AndroidAudioContentType.speech,
-        flags: AndroidAudioFlags.none,
-        usage: AndroidAudioUsage.voiceCommunication,
-      ),
-      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
-      androidWillPauseWhenDucked: true,
-    ));
-    //sampleRate = await _mRecorder!.getSampleRate();
-
-    setState(() {
-      _mRecorderIsInited = true;
-    });
-  }
 
   @override
   void initState() {
     super.initState();
-    // Be careful : openAudioSession return a Future.
+    setCodec(Codec.pcmFloat32);
     // Do not access your FlutterSoundPlayer or FlutterSoundRecorder before the completion of the Future
     _mPlayer!.openPlayer().then((value) {
       setState(() {
@@ -134,6 +99,47 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
 
   // ----------------------  Here is the code to record to a Stream ------------
 
+  static const int cstSAMPLERATE = 16000;
+  static const int cstCHANNELNB = 2;
+
+  /// We have finished with the recorder. Release the subscription
+  Future<void> cancelRecorderSubscriptions() async {
+    if (_recorderSubscription != null) {
+      await _recorderSubscription!.cancel();
+      _recorderSubscription = null;
+    }
+
+    if (_mRecordingDataSubscription != null) {
+      await _mRecordingDataSubscription!.cancel();
+      _mRecordingDataSubscription = null;
+    }
+  }
+
+  Future<void> _openRecorder() async {
+    var status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      throw RecordingPermissionException('Microphone permission not granted');
+    }
+    await _mRecorder!.openRecorder();
+
+    _recorderSubscription = _mRecorder!.onProgress!.listen((e) {
+      // pos = e.duration.inMilliseconds; // We do not need this information in this example.
+      setState(() {
+        _dbLevel = e.decibels as double;
+      });
+    });
+    await _mRecorder!.setSubscriptionDuration(
+        const Duration(milliseconds: 100)); // DO NOT FORGET THIS CALL !!!
+
+    setState(() {
+      _mRecorderIsInited = true;
+    });
+
+    setState(() {
+      _mRecorderIsInited = true;
+    });
+  }
+
   Future<void> record() async {
     assert(_mRecorderIsInited && _mPlayer!.isStopped);
     var sink = await createFile();
@@ -144,23 +150,28 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
     });
     await _mRecorder!.startRecorder(
       toStream: recordingDataController.sink,
-      codec: cstCODEC,
+      codec: codecSelected,
       numChannels: cstCHANNELNB,
       sampleRate: cstSAMPLERATE,
       bufferSize: 8192,
+      audioSource: AudioSource.defaultSource,
     );
-    setState(() {});
+    setState(() {
+      _dbLevel = 0.0;
+    });
   }
-  // --------------------- (it was very simple, wasn't it ?) -------------------
 
   Future<void> stopRecorder() async {
     await _mRecorder!.stopRecorder();
+
     if (_mRecordingDataSubscription != null) {
       await _mRecordingDataSubscription!.cancel();
       _mRecordingDataSubscription = null;
     }
+
     _mplaybackReady = true;
   }
+  // --------------------- (it was very simple, wasn't it ?) -------------------
 
   _Fn? getRecorderFn() {
     if (!_mRecorderIsInited || !_mPlayer!.isStopped) {
@@ -181,7 +192,7 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
     await _mPlayer!.startPlayer(
         fromURI: _mPath,
         sampleRate: cstSAMPLERATE,
-        codec: cstCODEC,
+        codec: codecSelected,
         numChannels: cstCHANNELNB,
         whenFinished: () {
           setState(() {});
@@ -205,6 +216,12 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
   }
 
   // ----------------------------------------------------------------------------------------------------------------------
+
+  void setCodec(Codec? codec) {
+    setState(() {
+      codecSelected = codec!;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +255,16 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
                   ? 'Recording in progress'
                   : 'Recorder is stopped'),
             ]),
+            const SizedBox(
+              height: 20,
+            ),
+            _mRecorder!.isRecording
+                ? LinearProgressIndicator(
+                    value: _dbLevel / 100,
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.indigo),
+                    backgroundColor: Colors.limeAccent)
+                : Container(),
           ]),
         ),
         Container(
@@ -267,6 +294,52 @@ class _RecordToStreamExampleState extends State<RecordToStreamExample> {
                   ? 'Playback in progress'
                   : 'Player is stopped'),
             ])),
+        Container(
+          margin: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(3),
+          height: 110,
+          width: double.infinity,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAF0E6),
+            border: Border.all(
+              color: Colors.indigo,
+              width: 3,
+            ),
+          ),
+          child: Column(
+            children: [
+              ListTile(
+                tileColor: const Color(0xFFFAF0E6),
+                title: const Text('PCM-Float32'),
+                dense: true,
+
+                //textColor: encoderSupported[Codec.pcmFloat32.index]
+                //? Colors.green
+                //: Colors.grey,
+                leading: Radio<Codec>(
+                  value: Codec.pcmFloat32,
+                  groupValue: codecSelected,
+                  onChanged: setCodec,
+                ),
+              ),
+              ListTile(
+                tileColor: const Color(0xFFFAF0E6),
+                title: const Text('PCM-Int16'),
+                dense: true,
+
+                ///textColor: encoderSupported[Codec.pcm16.index]
+                ///? Colors.green
+                //: Colors.grey,
+                leading: Radio<Codec>(
+                  value: Codec.pcm16,
+                  groupValue: codecSelected,
+                  onChanged: setCodec,
+                ),
+              ),
+            ],
+          ),
+        ),
       ]);
     }
 

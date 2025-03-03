@@ -125,7 +125,8 @@ class FoodData extends Food {
   Uint8List? data;
 
   /// The constructor, specifying the data to be sent or that has been received
-  /* ctor */ FoodData(this.data);
+  /* ctor */
+  FoodData(this.data);
 
   /// Used internally by Flutter Sound
   @override
@@ -141,7 +142,8 @@ class FoodEvent extends Food {
   Function on;
 
   /// The constructor, specifying the callback which must be fired when synchronization is done
-  /* ctor */ FoodEvent(this.on);
+  /* ctor */
+  FoodEvent(this.on);
 
   /// Used internally by Flutter Sound
   @override
@@ -181,7 +183,8 @@ class FlutterSound {
   }
 
   /// Private constructor of the Singleton
-  /* ctor */ FlutterSound._internal();
+  /* ctor */
+  FlutterSound._internal();
 
   /// This instance of [FlutterSoundPlayer] is just to be smart for the App.
   /// The Apps can use this instance without having to create a [FlutterSoundPlayer] themselves.
